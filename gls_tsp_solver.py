@@ -16,7 +16,7 @@ class GLSTSPSolver(BaseOptimizer):
         n = problem.nb_cities
         dist_matrix = problem.dist_matrix
         
-        start_node = self.start
+        start_node = 0
         tour = [start_node]
         visited = {start_node}
         current = start_node
