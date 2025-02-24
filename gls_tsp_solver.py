@@ -155,6 +155,14 @@ class GLSTSPSolver(BaseOptimizer):
         """Double bridge kick for escaping local minima"""
         n = len(tour)
         if n < 8:
-            return tour
-        i, j = sorted(np.random.choice(n-3, 2, replace=False)) + 1
-        return tour[:i] + tour[j:k][::-1] + tour[i:j][::-1] + tour[k:]
+            return tour.copy()
+        
+        # Select four distinct points ensuring proper spacing
+        while True:
+            indices = np.random.choice(range(1, n-2), 4, replace=False)
+            a, b, c, d = sorted(indices)
+            if (b-a > 1) and (c-b > 1) and (d-c > 1):
+                break
+                
+        # Create double bridge perturbation
+        return tour[:a] + tour[c:d] + tour[b:c] + tour[a:b] + tour[d:]
