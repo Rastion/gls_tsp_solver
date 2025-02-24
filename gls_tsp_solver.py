@@ -15,33 +15,17 @@ class GLSTSPSolver(BaseOptimizer):
         """Generate initial tour using the nearest neighbor heuristic."""
         n = problem.nb_cities
         dist_matrix = problem.dist_matrix
-        
-        start_node = 0
-        tour = [start_node]
-        visited = {start_node}
-        current = start_node
-
-        # Iteratively extend the route by selecting the closest unvisited node.
-        while len(tour) < n:
-            next_node = None
-            best_cost = float('inf')
-            for node in range(n):
-                if node not in visited:
-                    cost = dist_matrix[current][node]
-                    if cost < best_cost:
-                        best_cost = cost
-                        next_node = node
-            if next_node is None:
-                break  # In case no unvisited node is found.
-            tour.append(next_node)
-            visited.add(next_node)
-            current = next_node
-
-        # Optionally, one might want to close the tour by returning to the start node.
-        # tour.append(start_node)
-
-        cost = problem.evaluate_solution(tour)
-        return tour, cost
+        start = 0
+        tour = [start]
+        unvisited = set(range(n))
+        unvisited.remove(start)
+        current_city = start
+        while unvisited:
+            next_city = min(unvisited, key=lambda city: dist_matrix[current_city][city])
+            tour.append(next_city)
+            unvisited.remove(next_city)
+            current_city = next_city
+        return tour
 
     def optimize(self, problem, initial_solution=None, **kwargs):
         start_time = time.time()
