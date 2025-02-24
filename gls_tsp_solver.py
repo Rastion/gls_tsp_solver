@@ -115,7 +115,7 @@ class GLSTSPSolver(BaseOptimizer):
         while time.time() - start_time < time_limit:
             current_tour = local_search(current_tour)
             current_cost = problem.evaluate_solution(current_tour)
-
+            print(f"CC {current_cost}")
             if current_cost < best_cost:
                 best_tour, best_cost = current_tour, current_cost
                 stagnation = 0
