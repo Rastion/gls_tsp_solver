@@ -47,7 +47,7 @@ class GLSTSPSolver(BaseOptimizer):
         # For simplicity, we set a = 1.0 by default.
         a = 1.0
         def augmented_cost(tour):
-            cost = problem.evaluate(tour)
+            cost = problem.evaluate_solution(tour)
             penalty_sum = 0
             for k in range(len(tour) - 1):
                 key = edge_key(tour[k], tour[k+1])
@@ -57,7 +57,7 @@ class GLSTSPSolver(BaseOptimizer):
         # Generate an initial solution if not provided.
         current_tour = initial_solution if initial_solution is not None else problem.random_solution()
         best_tour = current_tour
-        best_cost = problem.evaluate(current_tour)
+        best_cost = problem.evaluate_solution(current_tour)
 
         # 2-opt local search using the augmented cost function.
         def local_search(tour):
@@ -85,7 +85,7 @@ class GLSTSPSolver(BaseOptimizer):
         while time.time() - start_time < time_limit and iteration < max_iterations:
             # Local search phase
             current_tour = local_search(current_tour)
-            current_orig_cost = problem.evaluate(current_tour)
+            current_orig_cost = problem.evaluate_solution(current_tour)
             if current_orig_cost < best_cost:
                 best_tour = current_tour
                 best_cost = current_orig_cost
