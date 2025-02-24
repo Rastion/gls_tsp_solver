@@ -52,7 +52,12 @@ class GLSTSPSolver(BaseOptimizer):
 
         # Adaptive parameter initialization
         a = 1.0  
-        current_tour = self.nearest_neighbor_solution(problem)
+
+        if initial_solution:
+            current_tour = initial_solution
+        else:
+            current_tour = self.nearest_neighbor_solution(problem)
+
         best_tour = current_tour.copy()
         best_cost = problem.evaluate_solution(best_tour)
         last_improvement = start_time
@@ -68,6 +73,7 @@ class GLSTSPSolver(BaseOptimizer):
             
             # Phase 2: Diversification through penalty updates
             current_cost = problem.evaluate_solution(current_tour)
+            print(current_cost)
             if current_cost < best_cost:
                 best_tour, best_cost = current_tour, current_cost
                 last_improvement = time.time()
