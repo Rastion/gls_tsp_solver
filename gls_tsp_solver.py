@@ -87,7 +87,6 @@ class GLSTSPSolver(BaseOptimizer):
                                 best_delta = delta_total
                                 best_move = (i, j)
                                 improved = True
-                print(improved)
                 if improved:
                     # Apply the best move
                     i, j = best_move
