@@ -1,0 +1,37 @@
+{
+    "entry_point": "gls_tsp_solver:GLSTSPSolver",
+    "default_params": {
+        "time_limit": 300,
+        "max_iterations": 100,
+        "lambda_param": 0.3
+    },
+    "optimizer_type": "Guided Local Search TSP Solver",
+    "description": "TSP solver using Guided Local Search (GLS) on top of a 2-opt local search. Penalties on edges (features) are updated to escape local minima.",
+    "compatible_problems": [
+        "Traveling Salesman Problem"
+    ],
+    "parameters": {
+        "time_limit": {
+            "type": "int",
+            "description": "Maximum allowed time in seconds."
+        },
+        "max_iterations": {
+            "type": "int",
+            "description": "Maximum number of GLS iterations."
+        },
+        "lambda_param": {
+            "type": "float",
+            "description": "Penalty multiplier parameter lambda."
+        }
+    },
+    "requirements": [
+        "qubots"
+    ],
+    "keywords": [
+        "guided local search",
+        "GLS",
+        "TSP",
+        "local search",
+        "2-opt"
+    ]
+}
