@@ -3,7 +3,8 @@
     "default_params": {
         "time_limit": 300,
         "lambda_param": 0.3,
-        "neighbor_ratio": 0.05
+        "a": 1,
+        "k": 10
     },
     "optimizer_type": "Guided Local Search TSP Solver",
     "description": "TSP solver using Guided Local Search (GLS) on top of a 2-opt local search. Penalties on edges (features) are updated to escape local minima.",
@@ -15,13 +16,17 @@
             "type": "int",
             "description": "Maximum allowed time in seconds."
         },
-        "max_iterations": {
-            "type": "int",
-            "description": "Maximum number of GLS iterations."
-        },
         "lambda_param": {
             "type": "float",
             "description": "Penalty multiplier parameter lambda."
+        },
+        "a": {
+            "type": "float",
+            "description": "Adaptive parameter initialization."
+        },
+        "k": {
+            "type": "int",
+            "description": "Number of features (example in TSP number of neighbors to keep a list for)."
         }
     },
     "requirements": [

@@ -11,10 +11,11 @@ class GLSTSPSolver(BaseOptimizer):
     - Time-aware iterative deepening
     - Dynamic neighborhood sizing
     """
-    def __init__(self, time_limit=300, lambda_param=0.2, neighbor_ratio=0.05):
+    def __init__(self, time_limit=300, lambda_param=0.2, a=1, k=10):
         self.time_limit = time_limit
         self.lambda_param = lambda_param
-        self.neighbor_ratio = neighbor_ratio
+        self.a = a # Adaptive parameter initialization
+        self.k = k # Number of features (example in TSP number of neighbors to keep a list for)
 
     def nearest_neighbor_solution(self, problem):
         """Generate initial tour using the nearest neighbor heuristic."""
@@ -37,18 +38,16 @@ class GLSTSPSolver(BaseOptimizer):
         time_limit = kwargs.get('time_limit', self.time_limit)
         n = problem.nb_cities
         dist_matrix = np.asarray(problem.dist_matrix)
-        k = max(10, int(n * self.neighbor_ratio))
 
         # Precompute data structures
-        neighbor_lists = np.zeros((n, k), dtype=int)
+        neighbor_lists = np.zeros((n, self.k), dtype=int)
         for i in range(n):
-            neighbor_lists[i] = np.argsort(dist_matrix[i])[1:k+1]
+            neighbor_lists[i] = np.argsort(dist_matrix[i])[1:self.k+1]
             
         # Penalty matrix (symmetric storage)
         penalties = np.zeros((n, n), dtype=int)
 
-        # Adaptive parameter initialization
-        a = 1.0  
+        
 
         if initial_solution:
             current_tour = initial_solution
@@ -65,7 +64,7 @@ class GLSTSPSolver(BaseOptimizer):
             current_tour = self.time_aware_2opt(
                 current_tour, dist_matrix, neighbor_lists,
                 start_time, time_limit - (time.time() - start_time),
-                penalties, a
+                penalties
             )
             
             # Phase 2: Diversification through penalty updates
@@ -86,7 +85,7 @@ class GLSTSPSolver(BaseOptimizer):
         return best_tour, best_cost
 
     def time_aware_2opt(self, tour, dist_matrix, neighbor_lists, 
-                   start_time, time_budget, penalties, a):
+                   start_time, time_budget, penalties):
         """2-opt with depot locking at position 0"""
         n = len(tour)
         improved = True
@@ -120,7 +119,7 @@ class GLSTSPSolver(BaseOptimizer):
                     delta = (dist_matrix[A,C] + dist_matrix[B_node,D]) - \
                             (dist_matrix[A,B_node] + dist_matrix[C,D])
                             
-                    penalty_delta = self.lambda_param * a * (
+                    penalty_delta = self.lambda_param * self.a * (
                         penalties[A,C] + penalties[B_node,D] - 
                         penalties[A,B_node] - penalties[C,D]
                     )
