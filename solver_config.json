@@ -2,7 +2,8 @@
     "entry_point": "gls_tsp_solver:GLSTSPSolver",
     "default_params": {
         "time_limit": 300,
-        "lambda_param": 0.3
+        "lambda_param": 0.3,
+        "neighbor_ratio": 0.05
     },
     "optimizer_type": "Guided Local Search TSP Solver",
     "description": "TSP solver using Guided Local Search (GLS) on top of a 2-opt local search. Penalties on edges (features) are updated to escape local minima.",

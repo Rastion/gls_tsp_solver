@@ -1,138 +1,154 @@
 from qubots.base_optimizer import BaseOptimizer
 import time
-from functools import lru_cache
 import numpy as np
 
 class GLSTSPSolver(BaseOptimizer):
     """
-    Enhanced Guided Local Search (GLS) TSP Solver with time-aware local search.
+    Scalable Guided Local Search for TSP with adaptive neighborhood management.
+    Features:
+    - Matrix-based penalty tracking
+    - Precomputed neighbor lists
+    - Time-aware iterative deepening
+    - Dynamic neighborhood sizing
     """
-    def __init__(self, time_limit=300, lambda_param=0.2):
+    def __init__(self, time_limit=300, lambda_param=0.2, neighbor_ratio=0.05):
         self.time_limit = time_limit
         self.lambda_param = lambda_param
+        self.neighbor_ratio = neighbor_ratio
 
     def nearest_neighbor_solution(self, problem):
-        """Generate initial tour using the nearest neighbor heuristic."""
+        """Vectorized nearest neighbor implementation"""
         n = problem.nb_cities
         dist_matrix = problem.dist_matrix
-        start = 0
-        tour = [start]
-        unvisited = set(range(n))
-        unvisited.remove(start)
-        current_city = start
-        while unvisited:
-            next_city = min(unvisited, key=lambda city: dist_matrix[current_city][city])
+        tour = [0]
+        mask = np.ones(n, dtype=bool)
+        mask[0] = False
+        
+        for _ in range(n-1):
+            last = tour[-1]
+            candidates = np.where(mask)[0]
+            if not candidates.size:
+                break
+            next_city = candidates[np.argmin(dist_matrix[last, candidates])]
             tour.append(next_city)
-            unvisited.remove(next_city)
-            current_city = next_city
+            mask[next_city] = False
+            
         return tour
 
     def optimize(self, problem, initial_solution=None, **kwargs):
         start_time = time.time()
         time_limit = kwargs.get('time_limit', self.time_limit)
-        lambda_param = self.lambda_param
-
         n = problem.nb_cities
-        dist_matrix = problem.dist_matrix
+        dist_matrix = np.asarray(problem.dist_matrix)
+        k = max(10, int(n * self.neighbor_ratio))
 
-        # Initialize edge penalties
-        penalties = {}
+        # Precompute data structures
+        neighbor_lists = np.zeros((n, k), dtype=int)
         for i in range(n):
-            for j in range(i + 1, n):
-                penalties[(i, j)] = 0
-
-        def edge_key(i, j):
-            return (min(i, j), max(i, j))
-
-        a = 1.0  # Initial coefficient
-
-        def augmented_cost(tour):
-            """Compute the augmented cost including penalties."""
-            cost = problem.evaluate_solution(tour)
-            penalty_sum = sum(penalties.get(edge_key(tour[k], tour[k+1]), 0) for k in range(len(tour)-1))
-            return cost + lambda_param * a * penalty_sum
-        
-        def create_neighbor_lists(problem, k=20):
-            """Precompute k nearest neighbors for each city"""
-            return [
-                np.argsort(dist_matrix[i])[1:k+1]  # Exclude self
-                for i in range(problem.nb_cities)
-            ]
-        
-        @lru_cache(maxsize=100000)
-        def cached_dist(a, b):
-            return dist_matrix[a][b]
-
-        def local_search(tour, record_improvements=False):
-            """Optimized 2-opt with neighbor lists and first-improvement"""
-            current = tour.copy()
-            improved = True
-            neighbor_list = create_neighbor_lists(problem)  # Precomputed
+            neighbor_lists[i] = np.argsort(dist_matrix[i])[1:k+1]
             
-            while improved and (time.time() - start_time < time_limit):
-                improved = False
-                shuffled_indices = np.random.permutation(len(current)-2) + 1  # Randomized search
-                
-                for i in shuffled_indices:
-                    B = current[i]
-                    candidates = [idx for idx, city in enumerate(current) 
-                                if city in neighbor_list[B] and idx > i]
-                    
-                    for j in candidates:
-                        A, C, D, D_next = current[i-1], current[j-1], current[j], current[(j+1)%len(current)]
-                        
-                        # Fast delta calculation
-                        delta = (cached_dist(A, C) + cached_dist(B, D_next)) - \
-                                (cached_dist(A, B) + cached_dist(C, D))
-                        
-                        if delta < -1e-6:  # Threshold for numerical stability
-                            current = current[:i] + current[i:j][::-1] + current[j:]
-                            improved = True
-                            break
-                    if improved:
-                        break
-                        
-            return current
+        # Penalty matrix (symmetric storage)
+        penalties = np.zeros((n, n), dtype=int)
 
-        # --- Phase 1: Determine coefficient 'a' ---
-        initial_tour = self.nearest_neighbor_solution(problem) if initial_solution is None else initial_solution
-        #current_tour, improvements = local_search(initial_tour, record_improvements=True)
-        #if improvements:
-        #    avg_improvement = sum(improvements) / len(improvements)
-        #    a = avg_improvement / (len(current_tour) - 1) if len(current_tour) > 1 else 1.0
-        #else:
-        #    a = 1.0
-        a = 100
-        # --- Phase 2: GLS iterations ---
-        best_tour, best_cost = initial_tour, problem.evaluate_solution(initial_tour)
-        current_tour = best_tour.copy()
-        stagnation = 0
-        print(f"C = {best_cost}")
+        # Adaptive parameter initialization
+        a = 1.0  
+        current_tour = self.nearest_neighbor_solution(problem)
+        best_tour = current_tour.copy()
+        best_cost = problem.evaluate_solution(best_tour)
+        last_improvement = start_time
+
+        # Iterative deepening main loop
         while time.time() - start_time < time_limit:
-            current_tour = local_search(current_tour)
+            # Phase 1: Intensification with time-budgeted 2-opt
+            current_tour = self.time_aware_2opt(
+                current_tour, dist_matrix, neighbor_lists,
+                start_time, time_limit - (time.time() - start_time),
+                penalties, a
+            )
+            
+            # Phase 2: Diversification through penalty updates
             current_cost = problem.evaluate_solution(current_tour)
-            print(f"CC = {current_cost}")
             if current_cost < best_cost:
                 best_tour, best_cost = current_tour, current_cost
-                stagnation = 0
-            else:
-                stagnation += 1
-                if stagnation >= 50:
-                    break  # Terminate if no improvement in 50 iterations
-
-            # Update penalties based on current tour
-            utilities = {}
-            max_util = -1
-            for k in range(len(current_tour) - 1):
-                i, j = current_tour[k], current_tour[k+1]
-                key = edge_key(i, j)
-                utilities[key] = dist_matrix[i][j] / (1 + penalties[key])
-                if utilities[key] > max_util:
-                    max_util = utilities[key]
-
-            # Penalize edges with maximum utility
-            for key in utilities:
-                if abs(utilities[key] - max_util) < 1e-6:
-                    penalties[key] += 1
+                last_improvement = time.time()
+            
+            # Adaptive penalty activation
+            self.update_penalties(current_tour, dist_matrix, penalties)
+            
+            # Escape condition: No improvement in adaptive window
+            if time.time() - last_improvement > (time_limit * 0.2):
+                current_tour = self.diversify_solution(best_tour)
 
         return best_tour, best_cost
+
+    def time_aware_2opt(self, tour, dist_matrix, neighbor_lists, 
+                       start_time, time_budget, penalties, a):
+        """2-opt with time budgeting and penalty-aware moves"""
+        n = len(tour)
+        improved = True
+        current = np.array(tour)
+        best_cost = self.augmented_cost(current, dist_matrix, penalties, a)
+        
+        while improved and (time.time() - start_time < time_budget):
+            improved = False
+            for i in np.random.permutation(n-1):
+                if time.time() - start_time >= time_budget:
+                    return current.tolist()
+                    
+                # Neighborhood restricted search
+                B = current[i]
+                candidates = neighbor_lists[B]
+                in_tour = np.isin(current, candidates)
+                possible_j = np.where(in_tour)[0]
+                possible_j = possible_j[possible_j > i]
+                
+                for j in possible_j:
+                    if j <= i+1:
+                        continue
+                        
+                    # Fast delta calculation with penalty consideration
+                    A, B_node, C, D = current[i-1], B, current[j-1], current[j]
+                    cost_before = (dist_matrix[A,B_node] + dist_matrix[C,D])
+                    cost_after = (dist_matrix[A,C] + dist_matrix[B_node,D])
+                    delta = cost_after - cost_before
+                    
+                    penalty_before = penalties[A,B_node] + penalties[C,D]
+                    penalty_after = penalties[A,C] + penalties[B_node,D]
+                    penalty_delta = self.lambda_param * a * (penalty_after - penalty_before)
+                    
+                    if delta + penalty_delta < -1e-6:
+                        current[i:j] = current[i:j][::-1]
+                        improved = True
+                        break
+                if improved:
+                    break
+                    
+        return current.tolist()
+
+    def update_penalties(self, tour, dist_matrix, penalties):
+        """Sparse penalty update focusing on critical edges"""
+        utilities = []
+        for i in range(len(tour)-1):
+            u, v = sorted([tour[i], tour[i+1]])
+            utility = dist_matrix[u,v] / (1 + penalties[u,v])
+            utilities.append( (utility, u, v) )
+            
+        max_util = max(utilities, key=lambda x: x[0])[0]
+        for util, u, v in utilities:
+            if util >= max_util - 1e-6:
+                penalties[u,v] += 1
+
+    def augmented_cost(self, tour, dist_matrix, penalties, a):
+        """Vectorized augmented cost calculation"""
+        edges = np.sort(np.column_stack([tour[:-1], tour[1:]]), axis=1)
+        base_cost = dist_matrix[edges[:,0], edges[:,1]].sum()
+        penalty_cost = penalties[edges[:,0], edges[:,1]].sum()
+        return base_cost + self.lambda_param * a * penalty_cost
+
+    def diversify_solution(self, tour):
+        """Double bridge kick for escaping local minima"""
+        n = len(tour)
+        if n < 8:
+            return tour
+        i, j = sorted(np.random.choice(n-3, 2, replace=False)) + 1
+        return tour[:i] + tour[j:k][::-1] + tour[i:j][::-1] + tour[k:]
