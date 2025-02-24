@@ -89,20 +89,20 @@ class GLSTSPSolver(BaseOptimizer):
         return best_tour, best_cost
 
     def time_aware_2opt(self, tour, dist_matrix, neighbor_lists, 
-                       start_time, time_budget, penalties, a):
-        """2-opt with time budgeting and penalty-aware moves"""
+                   start_time, time_budget, penalties, a):
+        """2-opt with depot locking at position 0"""
         n = len(tour)
         improved = True
         current = np.array(tour)
-        best_cost = self.augmented_cost(current, dist_matrix, penalties, a)
+        #best_cost = self.augmented_cost(current, dist_matrix, penalties, a)
         
+        # Only permute indices from 1 to n-2 (never touch depot)
         while improved and (time.time() - start_time < time_budget):
             improved = False
-            for i in np.random.permutation(n-1):
+            for i in (np.random.permutation(n-2) + 1):  # Start from index 1
                 if time.time() - start_time >= time_budget:
                     return current.tolist()
                     
-                # Neighborhood restricted search
                 B = current[i]
                 candidates = neighbor_lists[B]
                 in_tour = np.isin(current, candidates)
@@ -113,15 +113,20 @@ class GLSTSPSolver(BaseOptimizer):
                     if j <= i+1:
                         continue
                         
-                    # Fast delta calculation with penalty consideration
-                    A, B_node, C, D = current[i-1], B, current[j-1], current[j]
-                    cost_before = (dist_matrix[A,B_node] + dist_matrix[C,D])
-                    cost_after = (dist_matrix[A,C] + dist_matrix[B_node,D])
-                    delta = cost_after - cost_before
+                    A, B_node = current[i-1], B
+                    C, D = current[j-1], current[j]
                     
-                    penalty_before = penalties[A,B_node] + penalties[C,D]
-                    penalty_after = penalties[A,C] + penalties[B_node,D]
-                    penalty_delta = self.lambda_param * a * (penalty_after - penalty_before)
+                    # Skip moves involving depot (index 0)
+                    if 0 in {A, B_node, C, D}:
+                        continue
+                    
+                    delta = (dist_matrix[A,C] + dist_matrix[B_node,D]) - \
+                            (dist_matrix[A,B_node] + dist_matrix[C,D])
+                            
+                    penalty_delta = self.lambda_param * a * (
+                        penalties[A,C] + penalties[B_node,D] - 
+                        penalties[A,B_node] - penalties[C,D]
+                    )
                     
                     if delta + penalty_delta < -1e-6:
                         current[i:j] = current[i:j][::-1]
@@ -153,17 +158,17 @@ class GLSTSPSolver(BaseOptimizer):
         return base_cost + self.lambda_param * a * penalty_cost
 
     def diversify_solution(self, tour):
-        """Double bridge kick for escaping local minima"""
+        """Double bridge kick with depot protection"""
         n = len(tour)
         if n < 8:
             return tour.copy()
         
-        # Select four distinct points ensuring proper spacing
+        # Ensure perturbations never affect depot
         while True:
             indices = np.random.choice(range(1, n-2), 4, replace=False)
             a, b, c, d = sorted(indices)
-            if (b-a > 1) and (c-b > 1) and (d-c > 1):
+            if (a > 0 and d < n-1 and 
+                (b-a > 1) and (c-b > 1) and (d-c > 1)):
                 break
                 
-        # Create double bridge perturbation
         return tour[:a] + tour[c:d] + tour[b:c] + tour[a:b] + tour[d:]
