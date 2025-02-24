@@ -17,22 +17,19 @@ class GLSTSPSolver(BaseOptimizer):
         self.neighbor_ratio = neighbor_ratio
 
     def nearest_neighbor_solution(self, problem):
-        """Vectorized nearest neighbor implementation"""
+        """Generate initial tour using the nearest neighbor heuristic."""
         n = problem.nb_cities
         dist_matrix = problem.dist_matrix
-        tour = [0]
-        mask = np.ones(n, dtype=bool)
-        mask[0] = False
-        
-        for _ in range(n-1):
-            last = tour[-1]
-            candidates = np.where(mask)[0]
-            if not candidates.size:
-                break
-            next_city = candidates[np.argmin(dist_matrix[last, candidates])]
+        start = 0
+        tour = [start]
+        unvisited = set(range(n))
+        unvisited.remove(start)
+        current_city = start
+        while unvisited:
+            next_city = min(unvisited, key=lambda city: dist_matrix[current_city][city])
             tour.append(next_city)
-            mask[next_city] = False
-            
+            unvisited.remove(next_city)
+            current_city = next_city
         return tour
 
     def optimize(self, problem, initial_solution=None, verbose=False, **kwargs):
