@@ -118,7 +118,7 @@ class GLSTSPSolver(BaseOptimizer):
         #    a = 1.0
         a = 1
         # --- Phase 2: GLS iterations ---
-        best_tour, best_cost = current_tour, problem.evaluate_solution(initial_tour)
+        best_tour, best_cost = initial_tour, problem.evaluate_solution(initial_tour)
         current_tour = best_tour.copy()
         stagnation = 0
         print(f"C = {best_cost}")
