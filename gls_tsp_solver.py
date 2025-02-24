@@ -1,6 +1,7 @@
 from qubots.base_optimizer import BaseOptimizer
 import time
-
+from functools import lru_cache
+import numpy as np
 class GLSTSPSolver(BaseOptimizer):
     """
     Enhanced Guided Local Search (GLS) TSP Solver with time-aware local search.
@@ -49,76 +50,48 @@ class GLSTSPSolver(BaseOptimizer):
             cost = problem.evaluate_solution(tour)
             penalty_sum = sum(penalties.get(edge_key(tour[k], tour[k+1]), 0) for k in range(len(tour)-1))
             return cost + lambda_param * a * penalty_sum
+        
+        def create_neighbor_lists(problem, k=20):
+            """Precompute k nearest neighbors for each city"""
+            return [
+                np.argsort(dist_matrix[i])[1:k+1]  # Exclude self
+                for i in range(problem.nb_cities)
+            ]
+        
+        @lru_cache(maxsize=100000)
+        def cached_dist(a, b):
+            return dist_matrix[a][b]
 
         def local_search(tour, record_improvements=False):
-            """2-opt local search with delta evaluations and time limit checks."""
+            """Optimized 2-opt with neighbor lists and first-improvement"""
             current = tour.copy()
             improved = True
-            improvements = []
-            best_augmented = augmented_cost(current)
-
-            while improved:
-                # Check time limit at the start of each iteration
-                if time.time() - start_time >= time_limit:
-                    break
-
+            neighbor_list = create_neighbor_lists(problem)  # Precomputed
+            
+            while improved and (time.time() - start_time < time_limit):
                 improved = False
-                best_delta = 0
-                best_move = None
-
-                # Iterate over all possible 2-opt moves
-                for i in range(1, len(current)-1):
-                    # Check time limit during outer loop
-                    if time.time() - start_time >= time_limit:
-                        break
-                    for j in range(i+1, len(current)):
-                        # Check time limit during inner loop
-                        if time.time() - start_time >= time_limit:
+                shuffled_indices = np.random.permutation(len(current)-2) + 1  # Randomized search
+                
+                for i in shuffled_indices:
+                    B = current[i]
+                    candidates = [idx for idx, city in enumerate(current) 
+                                if city in neighbor_list[B] and idx > i]
+                    
+                    for j in candidates:
+                        A, C, D, D_next = current[i-1], current[j-1], current[j], current[(j+1)%len(current)]
+                        
+                        # Fast delta calculation
+                        delta = (cached_dist(A, C) + cached_dist(B, D_next)) - \
+                                (cached_dist(A, B) + cached_dist(C, D))
+                        
+                        if delta < -1e-6:  # Threshold for numerical stability
+                            current = current[:i] + current[i:j][::-1] + current[j:]
+                            improved = True
                             break
-                        if j == i + 1:
-                            continue  # Skip adjacent swap
-
-                        # Nodes involved in the 2-opt move
-                        A = current[i-1]
-                        B = current[i]
-                        C = current[j-1]
-                        D = current[j]
-                        D_next = current[(j + 1) % len(current)]  # Wrap-around for last city
-
-                        # Delta for original cost (corrected for wrap-around)
-                        delta_original = (dist_matrix[A][C] + dist_matrix[B][D_next]) - (dist_matrix[A][B] + dist_matrix[C][D])
-
-                        # Delta for penalties (corrected edges)
-                        edge_AC = edge_key(A, C)
-                        edge_BD_next = edge_key(B, D_next)
-                        edge_AB = edge_key(A, B)
-                        edge_CD = edge_key(C, D)
-
-                        delta_penalty = (
-                            penalties.get(edge_AC, 0) + 
-                            penalties.get(edge_BD_next, 0) - 
-                            penalties.get(edge_AB, 0) - 
-                            penalties.get(edge_CD, 0)
-                        )
-
-                        # Total delta for augmented cost
-                        delta_total = delta_original + lambda_param * a * delta_penalty
-
-                        if delta_total < 0:  # Improving move
-                            if not improved or delta_total < best_delta:
-                                best_delta = delta_total
-                                best_move = (i, j)
-                                improved = True
-
-                if improved:
-                    # Apply the best move
-                    i, j = best_move
-                    current = current[:i] + current[i:j][::-1] + current[j:]
-                    best_augmented += best_delta
-                    if record_improvements:
-                        improvements.append(-delta_original)  # Track original cost improvement
-
-            return (current, improvements) if record_improvements else current
+                    if improved:
+                        break
+                        
+            return current
 
         # --- Phase 1: Determine coefficient 'a' ---
         initial_tour = self.nearest_neighbor_solution(problem) if initial_solution is None else initial_solution
