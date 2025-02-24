@@ -14,9 +14,8 @@ class GLSTSPSolver(BaseOptimizer):
       max_iterations (int): Maximum number of GLS iterations.
       lambda_param (float): Parameter controlling the influence of the penalty term.
     """
-    def __init__(self, time_limit=300, max_iterations=100, lambda_param=0.3):
+    def __init__(self, time_limit=300, lambda_param=0.3):
         self.time_limit = time_limit
-        self.max_iterations = max_iterations
         self.lambda_param = lambda_param
 
     def optimize(self, problem, initial_solution=None, **kwargs):
@@ -82,7 +81,7 @@ class GLSTSPSolver(BaseOptimizer):
             return current
 
         iteration = 0
-        while time.time() - start_time < time_limit and iteration < max_iterations:
+        while time.time() - start_time < time_limit:
             # Local search phase
             current_tour = local_search(current_tour)
             current_orig_cost = problem.evaluate_solution(current_tour)
