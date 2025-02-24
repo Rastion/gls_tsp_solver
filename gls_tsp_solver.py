@@ -101,15 +101,15 @@ class GLSTSPSolver(BaseOptimizer):
 
         # Phase 1: Determine coefficient 'a'
         initial_tour = self.nearest_neighbor_solution(problem) if initial_solution is None else initial_solution
-        current_tour, improvements = local_search(initial_tour, record_improvements=True)
-        if improvements:
-            avg_improvement = sum(improvements) / len(improvements)
-            a = avg_improvement / (len(current_tour) - 1) if len(current_tour) > 1 else 1.0
-        else:
-            a = 1.0
-
+        #current_tour, improvements = local_search(initial_tour, record_improvements=True)
+        #if improvements:
+        #    avg_improvement = sum(improvements) / len(improvements)
+        #    a = avg_improvement / (len(current_tour) - 1) if len(current_tour) > 1 else 1.0
+        #else:
+        #    a = 1.0
+        a = 1
         # Phase 2: GLS iterations
-        best_tour, best_cost = current_tour, problem.evaluate_solution(current_tour)
+        best_tour, best_cost = initial_tour, problem.evaluate_solution(initial_tour)
         stagnation = 0
         print(f"C {best_cost}")
         while time.time() - start_time < time_limit:    
