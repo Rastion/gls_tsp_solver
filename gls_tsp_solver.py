@@ -3,7 +3,7 @@ import time
 
 class GLSTSPSolver(BaseOptimizer):
     """
-    Enhanced Guided Local Search (GLS) TSP Solver with delta evaluations, nearest neighbor initialization, and stagnation detection.
+    Enhanced Guided Local Search (GLS) TSP Solver with time-aware local search.
     """
     def __init__(self, time_limit=300, lambda_param=0.2):
         self.time_limit = time_limit
@@ -51,20 +51,30 @@ class GLSTSPSolver(BaseOptimizer):
             return cost + lambda_param * a * penalty_sum
 
         def local_search(tour, record_improvements=False):
-            """2-opt local search with delta evaluations."""
+            """2-opt local search with delta evaluations and time limit checks."""
             current = tour.copy()
             improved = True
             improvements = []
-            #original_cost = problem.evaluate_solution(current)
             best_augmented = augmented_cost(current)
 
             while improved:
+                # Check time limit at the start of each iteration
+                if time.time() - start_time >= time_limit:
+                    break
+
                 improved = False
                 best_delta = 0
                 best_move = None
 
+                # Iterate over all possible 2-opt moves
                 for i in range(1, len(current)-1):
+                    # Check time limit during outer loop
+                    if time.time() - start_time >= time_limit:
+                        break
                     for j in range(i+1, len(current)):
+                        # Check time limit during inner loop
+                        if time.time() - start_time >= time_limit:
+                            break
                         if j == i + 1:
                             continue  # Skip adjacent swap
 
@@ -87,6 +97,7 @@ class GLSTSPSolver(BaseOptimizer):
                                 best_delta = delta_total
                                 best_move = (i, j)
                                 improved = True
+                
                 if improved:
                     # Apply the best move
                     i, j = best_move
@@ -94,11 +105,10 @@ class GLSTSPSolver(BaseOptimizer):
                     best_augmented += best_delta
                     if record_improvements:
                         improvements.append(-delta_original)  # Track original cost improvement
-                    improved = True
 
             return (current, improvements) if record_improvements else current
 
-        # Phase 1: Determine coefficient 'a'
+        # --- Phase 1: Determine coefficient 'a' ---
         initial_tour = self.nearest_neighbor_solution(problem) if initial_solution is None else initial_solution
         #current_tour, improvements = local_search(initial_tour, record_improvements=True)
         #if improvements:
@@ -107,22 +117,22 @@ class GLSTSPSolver(BaseOptimizer):
         #else:
         #    a = 1.0
         a = 1
-        # Phase 2: GLS iterations
-        best_tour, best_cost = initial_tour, problem.evaluate_solution(initial_tour)
-        current_tour = initial_tour
+        # --- Phase 2: GLS iterations ---
+        best_tour, best_cost = current_tour, problem.evaluate_solution(initial_tour)
+        current_tour = best_tour.copy()
         stagnation = 0
-        print(f"C {best_cost}")
-        while time.time() - start_time < time_limit:    
+        print(f"C = {best_cost}")
+        while time.time() - start_time < time_limit:
             current_tour = local_search(current_tour)
             current_cost = problem.evaluate_solution(current_tour)
-            print(f"CC {current_cost}")
+            print(f"CC = {current_cost}")
             if current_cost < best_cost:
                 best_tour, best_cost = current_tour, current_cost
                 stagnation = 0
             else:
                 stagnation += 1
                 if stagnation >= 50:
-                    break  # Stagnation detected
+                    break  # Terminate if no improvement in 50 iterations
 
             # Update penalties based on current tour
             utilities = {}
@@ -134,7 +144,7 @@ class GLSTSPSolver(BaseOptimizer):
                 if utilities[key] > max_util:
                     max_util = utilities[key]
 
-            # Apply penalties to edges with max utility
+            # Penalize edges with maximum utility
             for key in utilities:
                 if abs(utilities[key] - max_util) < 1e-6:
                     penalties[key] += 1
