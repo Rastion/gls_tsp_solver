@@ -35,7 +35,7 @@ class GLSTSPSolver(BaseOptimizer):
             
         return tour
 
-    def optimize(self, problem, initial_solution=None, **kwargs):
+    def optimize(self, problem, initial_solution=None, verbose=False, **kwargs):
         start_time = time.time()
         time_limit = kwargs.get('time_limit', self.time_limit)
         n = problem.nb_cities
@@ -73,7 +73,8 @@ class GLSTSPSolver(BaseOptimizer):
             
             # Phase 2: Diversification through penalty updates
             current_cost = problem.evaluate_solution(current_tour)
-            print(current_cost)
+            if verbose:
+                print(f"Current cost: {current_cost}")
             if current_cost < best_cost:
                 best_tour, best_cost = current_tour, current_cost
                 last_improvement = time.time()
