@@ -21,7 +21,6 @@ class GLSTSPSolver(BaseOptimizer):
     def optimize(self, problem, initial_solution=None, **kwargs):
         start_time = time.time()
         time_limit = kwargs.get('time_limit', self.time_limit)
-        max_iterations = kwargs.get('max_iterations', self.max_iterations)
         lambda_param = self.lambda_param
 
         n = problem.nb_cities
