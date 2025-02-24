@@ -79,15 +79,27 @@ class GLSTSPSolver(BaseOptimizer):
                             continue  # Skip adjacent swap
 
                         # Nodes involved in the 2-opt move
-                        A, B, C, D = current[i-1], current[i], current[j-1], current[j]
+                        A = current[i-1]
+                        B = current[i]
+                        C = current[j-1]
+                        D = current[j]
+                        D_next = current[(j + 1) % len(current)]  # Wrap-around for last city
 
-                        # Delta for original cost
-                        delta_original = (dist_matrix[A][C] + dist_matrix[B][D]) - (dist_matrix[A][B] + dist_matrix[C][D])
+                        # Delta for original cost (corrected for wrap-around)
+                        delta_original = (dist_matrix[A][C] + dist_matrix[B][D_next]) - (dist_matrix[A][B] + dist_matrix[C][D])
 
-                        # Delta for penalties
-                        edge_AC, edge_BD = edge_key(A, C), edge_key(B, D)
-                        edge_AB, edge_CD = edge_key(A, B), edge_key(C, D)
-                        delta_penalty = (penalties[edge_AC] + penalties[edge_BD] - penalties[edge_AB] - penalties[edge_CD])
+                        # Delta for penalties (corrected edges)
+                        edge_AC = edge_key(A, C)
+                        edge_BD_next = edge_key(B, D_next)
+                        edge_AB = edge_key(A, B)
+                        edge_CD = edge_key(C, D)
+
+                        delta_penalty = (
+                            penalties.get(edge_AC, 0) + 
+                            penalties.get(edge_BD_next, 0) - 
+                            penalties.get(edge_AB, 0) - 
+                            penalties.get(edge_CD, 0)
+                        )
 
                         # Total delta for augmented cost
                         delta_total = delta_original + lambda_param * a * delta_penalty
@@ -97,7 +109,7 @@ class GLSTSPSolver(BaseOptimizer):
                                 best_delta = delta_total
                                 best_move = (i, j)
                                 improved = True
-                
+
                 if improved:
                     # Apply the best move
                     i, j = best_move
