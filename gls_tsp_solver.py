@@ -55,10 +55,10 @@ class GLSTSPSolver(BaseOptimizer):
             current = tour.copy()
             improved = True
             improvements = []
-            original_cost = problem.evaluate_solution(current)
+            #original_cost = problem.evaluate_solution(current)
             best_augmented = augmented_cost(current)
 
-            while improved and (time.time() - start_time < time_limit):
+            while improved:
                 improved = False
                 best_delta = 0
                 best_move = None
@@ -87,7 +87,7 @@ class GLSTSPSolver(BaseOptimizer):
                                 best_delta = delta_total
                                 best_move = (i, j)
                                 improved = True
-
+                print(improved)
                 if improved:
                     # Apply the best move
                     i, j = best_move
