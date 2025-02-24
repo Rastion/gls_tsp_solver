@@ -111,8 +111,8 @@ class GLSTSPSolver(BaseOptimizer):
         # Phase 2: GLS iterations
         best_tour, best_cost = current_tour, problem.evaluate_solution(current_tour)
         stagnation = 0
-
-        while time.time() - start_time < time_limit:
+        print(f"C {best_cost}")
+        while time.time() - start_time < time_limit:    
             current_tour = local_search(current_tour)
             current_cost = problem.evaluate_solution(current_tour)
             print(f"CC {current_cost}")
