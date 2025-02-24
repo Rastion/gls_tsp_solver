@@ -102,7 +102,7 @@ class GLSTSPSolver(BaseOptimizer):
         #    a = avg_improvement / (len(current_tour) - 1) if len(current_tour) > 1 else 1.0
         #else:
         #    a = 1.0
-        a = 1
+        a = 1000
         # --- Phase 2: GLS iterations ---
         best_tour, best_cost = initial_tour, problem.evaluate_solution(initial_tour)
         current_tour = best_tour.copy()
