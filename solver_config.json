@@ -2,7 +2,6 @@
     "entry_point": "gls_tsp_solver:GLSTSPSolver",
     "default_params": {
         "time_limit": 300,
-        "max_iterations": 100,
         "lambda_param": 0.3
     },
     "optimizer_type": "Guided Local Search TSP Solver",
